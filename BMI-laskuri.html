@@ -1,0 +1,175 @@
+<!-- 
+	JavaScriptiä käyttävä BMI-laskuri. Sisältää mahdollisuuden
+    säilyttää viimeksi annetut pituus ja paino, jolloin ne tallennetaan
+    selaimen paikalliseen pysyvään tallennustilaan (local storage).
+    Tallennetut tiedot tyhjennetään, kun säilytys laitetaan pois päältä.
+
+    Sivua ladattaessa tutkitaan, löytyykö tallennettuja tietoja. Jos
+    löytyy, lasketaan BMI niiden perusteella. Lisäksi tässä tapauksessa
+    laitetaan säilytysvalinta Kyllä-asetukseen. Jos tallennettuja tietoja
+    ei löydy, näytetään oletuksena pituus 170 cm ja paino 65 kg ja niiden
+    perusteella laskettu BMI. Lisäksi tässä tapauksessa säilytysvalinta
+    laitetaan Ei-asetukseen.
+
+    BMI-lasketaan tässä laskurissa kaavalla
+    BMI = paino / (pituus * pituus),
+    jossa paino ilmoitetaan kilogrammoissa ja pituus metreissä.
+
+	Copyright 2022 Raine Kauppinen
+	
+	Lisenssi:
+	Creative Commons Nimeä-EiKaupallinen 4.0 Kansainvälinen,
+	ks. http://creativecommons.org/licenses/by-nc/4.0/
+-->
+<!DOCTYPE html>
+<!-- Uusi kommentti -->
+<html>
+    <head>
+        <title>BMI-laskuri</title>
+    </head>
+    <!-- Tapahtuman onload käsittelevää alusta-funktiota kutsutaan
+         heti sivun latauduttua.
+    -->
+    <body onload="alusta();">
+        <!-- Lomake syötekentille (pituus ja paino). -->
+
+        <!-- Tapahtuman onchange (jomman kumman syötekentän arvo muuttui)
+             yhteydessä kutsutaan laskeBMI-funktiota parametreilla,
+             joka haetaan syötekentistä.
+        -->
+        <form onchange="laskeBMI(document.getElementById('pituus').value,
+            document.getElementById('paino').value);">
+            
+            <label for="pituus">Pituus (cm):</label>
+            <input type="number" id="pituus" name="pituus" min="1" max="999"
+                value="170">
+
+            <label for="paino">Paino (kg):</label>
+            <input type="number" id="paino" name="paino" min="1" max="999"
+                value="65">
+        </form>
+
+        <!-- Div-elementti, jonka sisältö korvataan lasketun BMI:n kertovalla
+             sisällöllä aina, kun BMI lasketaan. -->
+        <div id="bmi"><p>BMI:tä ei ole laskettu.</p></div>
+
+        <!-- Lomake, jossa on radiopainike viimeksi lasketun BMI:n
+             säilytysasetukseen eli tieto, tallennetaanko BMI selaimen
+             paikalliseen tallennustilaan vai ei.
+        -->
+        <!-- Tapahtuma onchange (valinta muuttui) kutsuu funktiota sailytys
+            parametrilla, joka true, jos valittuna on Kyllä ja muuten false.
+        -->
+        <form onchange="sailytys(document.getElementById('kylla').checked);">
+            <p>Säilytetäänkö laskettu BMI?</p>
+            <label for="ei">Ei</label>
+            <input type="radio" id="ei" name="tallennus" value="Ei">
+
+            <label for="kylla">Kyllä</label>
+            <input type="radio" id="kylla" name="tallennus" value="Kyllä">
+        </form>
+
+        <script>
+            /**
+             * JavaScript-osat
+             */
+            
+            /** Käytetään tarkempaa JavaScript-tyyliä (selaimen konsolille
+             * tulee enemmän virheilmoituksia huonosta ohjelmointityylistä
+             * ja tietyt potentiaaliset virheitä aiheuttavat ohjelmointi-
+             * tavat estetään).
+             */
+            "use strict";
+
+            /**
+             * Funktio alusta(), jota kutsutaan, kun sivu on ladattu.
+             * Hakee pituuden ja painon paikallisesta tallennustilasta ja
+             * jos ne löytyivät, laittaa ne HTML-sivun ko. kenttien arvoksi
+             * ja asettaa säilytysvalinnan Kyllä-asetukseen. Muuten asettaa
+             * pelkästään säilytysvalinta Ei-asetukseen. Joka tapauksessa
+             * kutsuu lopuksi funktiota laskeBMI parametreilla pituus ja
+             * paino, jotka haetaan HTML-sivun ko. kentistä.
+             */  
+            function alusta() {
+                // alusta muuttujat pituus ja paino hakemalla local storagesta
+                let pituus = localStorage.getItem('pituus');
+                let paino = localStorage.getItem('paino');
+
+                // tutki, löytyikö local storagesta (ovat null, jos ei)
+                    // jos löytyi
+                        // laita ko. pituus ja paino sivun kenttiin
+                        // ja laita säilytysvalinta Kyllä-asetukseen
+                    // muuten
+                        // laita säilytysvalinta Ei-asetukseen
+                if (pituus != null && paino != null) {
+                    document.getElementById('pituus').value = pituus;
+                    document.getElementById('paino').value = paino;
+                    document.getElementById('kylla').checked = 'true';
+                } else {
+                    document.getElementById('ei').checked = 'true';
+                }
+
+                // kutsu laskeBMI-funktiota parametreilla pituus ja paino,
+                // joiden arvot haetaan HTML-sivun ko. kentistä
+                laskeBMI(document.getElementById('pituus').value,
+                    document.getElementById('paino').value);
+            }
+
+            /**
+             * Funktio laskeBMI(pituus, paino), jota kutsutaan, kun
+             * halutaan laskea BMI:lle uusi arvo (sivun lataamisen jälkeen
+             * tai kun pituus- tai paino-kentän arvoa sivulla on muutettu).
+             * Laskee BMI:n pituuden ja painon perusteella, laittaa tuloksen
+             * näkyviin sivulle ja, jos säilytysvalinta on Kyllä-asetuksessa,
+             * tallentaa pituuden ja painon selaimen local storageen.
+             */
+            function laskeBMI(pituus, paino) {
+                // alusta muuttujat pituusMetreissa (pituus / 100) ja
+                // bmi (paino / (pituusMetreissa * pituusMetreissa))
+                let pituusMetreissa = pituus / 100;
+                let bmi = paino / (pituusMetreissa * pituusMetreissa);
+
+                // laita laskettu BMI näkyviin sivulle div-elementin, jonka
+                // id on "bmi", sisällöksi
+                document.getElementById('bmi').innerHTML = "<p>BMI: "
+                    + bmi.toFixed(1) + "</p>";
+                
+                // tutki, onko säilytysvalinta Kyllä asetuksessa
+                    // jos on
+                        // kutsu sailytys-funktiota parametrilla true
+                if (document.getElementById('kylla').checked) {
+                    sailytys(true);
+                }
+            }
+
+            /**
+             * Funktio sailytys(valinta), jota kutsutaan, kun
+             * säilytysvalinta (HTML-sivun Ei/Kyllä-valinta) asetetaan
+             * tai muuttuu. Parametri säilytys kertoo, onko säilytysvalinta
+             * Kyllä (valinta on tällöin true) vai Ei (valinta on tällöin
+             * false). Jos valinta on Kyllä, tallennetaan pituus ja paino
+             * omina avain-arvopareinaan selaimen local storageen. Jos
+             * valinta on Ei, poistetaan pituus ja paino local storagesta
+             * poistamalla niitä edustavat avain-arvoparit local storagesta.
+             */
+            function sailytys(valinta){
+                // tutki, onko valinta true
+                    // jos on
+                        // vie pituus avain-arvoparina local storageen ja
+                        // vie paino avain-arvoparina local storageen
+                    // muuten
+                        // poista pituus -avain-arvopari local storagesta ja
+                        // poista paino -avain-arvopari local storagesta
+                if (valinta == true) {
+                    localStorage.setItem('pituus',
+                        document.getElementById('pituus').value);
+                    localStorage.setItem('paino',
+                        document.getElementById('paino').value);
+                } else {
+                    localStorage.removeItem('pituus');
+                    localStorage.removeItem('paino');
+                }
+            }
+        </script>
+    </body>
+</html>
